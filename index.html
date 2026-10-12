@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>High Flyer — WSO</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d10;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: #d8e2ea; }
+  #gl, #hud { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #hud { pointer-events: none; }
+  body.playing { cursor: none; }
+  #gl.tgp { filter: grayscale(1) contrast(1.25) brightness(0.95) blur(0.5px); }
+  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(6, 9, 12, .62); backdrop-filter: blur(2px); z-index: 10; cursor: default; }
+  .overlay.hidden { display: none; }
+  .panel { max-width: 660px; width: calc(100% - 32px); max-height: calc(100% - 32px); overflow: auto;
+    box-sizing: border-box; background: rgba(14, 19, 24, .94); border: 1px solid #2c3a44;
+    border-radius: 10px; padding: 26px 30px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+  h1 { margin: 0; font-size: 30px; letter-spacing: .16em; color: #9dffb0; }
+  .sub { color: #7f97a8; letter-spacing: .1em; font-size: 12px; margin: 4px 0 18px; text-transform: uppercase; }
+  p { line-height: 1.55; font-size: 14px; color: #c3d0da; margin: 0 0 14px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 6px 0 16px; }
+  td { padding: 5px 4px; border-bottom: 1px solid #1f2a32; }
+  td:first-child { color: #9dffb0; white-space: nowrap; width: 38%; }
+  .tip { border-left: 3px solid #ffb347; padding: 8px 12px; background: rgba(255,179,71,.07);
+    font-size: 13px; color: #ffd9a8; margin-bottom: 18px; }
+  button { font: inherit; font-size: 15px; letter-spacing: .14em; padding: 12px 22px; border-radius: 6px;
+    border: 1px solid #5dd47a; background: #163b22; color: #b8ffc9; cursor: pointer; }
+  button:hover { background: #1d4f2d; }
+  .stats { display: grid; grid-template-columns: 1fr auto; gap: 6px 18px; font-size: 14px; margin: 10px 0 20px; }
+  .stats span:nth-child(even) { text-align: right; color: #fff; }
+  .result-ok { color: #9dffb0; }
+  .result-bad { color: #ff7b6b; }
+  #muteBtn { position: fixed; top: 10px; right: 12px; z-index: 20; width: 40px; height: 40px; padding: 0;
+    display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer;
+    border: 1px solid rgba(157,255,176,.35); background: rgba(5,8,10,.62); color: #c8ffd4; }
+  #muteBtn:hover { background: rgba(22,59,34,.85); }
+  #muteBtn svg { width: 22px; height: 22px; }
+  #muteBtn .off { display: none; }
+  #muteBtn.muted .on { display: none; }
+  #muteBtn.muted .off { display: block; }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="hud"></canvas>
+<button id="muteBtn" type="button" aria-label="Mute sound" title="Mute (M)">
+  <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+  <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/></svg>
+</button>
+
+<div class="overlay" id="brief">
+  <div class="panel">
+    <h1>HIGH FLYER</h1>
+    <div class="sub">Operation Nightjar · Weapons Systems Officer</div>
+    <p>You're in the back seat. The pilot flies the jet; you run the weapons. Catapult off the carrier,
+      win the dogfight over the water, then fly a long strike through three heavily defended target areas
+      (destroy at least <b>16 of 24</b>). Fight your way back out to sea and bring her aboard: the landing
+      checklist is yours.</p>
+    <table>
+      <tr><td>Mouse</td><td>Aim reticle / bomb designator</td></tr>
+      <tr><td>Hold reticle on bandit</td><td>Build a missile lock</td></tr>
+      <tr><td>Left click</td><td>Fire missile · (pod view) release bomb</td></tr>
+      <tr><td>Space / Right mouse</td><td>Gun (watch the heat) — can shoot down missiles</td></tr>
+      <tr><td>F</td><td>Flares</td></tr>
+      <tr><td>V</td><td>Toggle targeting pod (bird's-eye) view</td></tr>
+      <tr><td>G · H</td><td>Landing gear · tail hook (on approach)</td></tr>
+      <tr><td>P / Esc · M</td><td>Pause · Mute (or the speaker button, top right)</td></tr>
+    </table>
+    <div class="tip">Flares work best when the missile is close. Wait for the <b>FLARE</b> cue (about 2s out).
+      If you pop them too early, the missile keeps tracking.</div>
+    <button id="startBtn">BEGIN MISSION</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="end">
+  <div class="panel">
+    <h1 id="endTitle">MISSION COMPLETE</h1>
+    <div class="sub" id="endSub"></div>
+    <div class="stats" id="endStats"></div>
+    <button id="againBtn">FLY AGAIN</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
